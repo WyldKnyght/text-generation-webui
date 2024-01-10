@@ -106,7 +106,7 @@ class LlamacppHF(PreTrainedModel):
         labels = kwargs.get('labels', None)
         past_key_values = kwargs.get('past_key_values', None)
 
-        if len(args) > 0:
+        if args:
             if not shared.args.cfg_cache:
                 logger.error("Please enable the cfg-cache option to use CFG with llamacpp_HF.")
                 return
@@ -134,11 +134,7 @@ class LlamacppHF(PreTrainedModel):
             if past_seq is not None:
                 min_length = min(past_seq.shape[0], seq_tensor.shape[0])
                 indices = torch.nonzero(~torch.eq(past_seq[:min_length], seq_tensor[:min_length]))
-                if len(indices) > 0:
-                    longest_prefix = indices[0].item()
-                else:
-                    longest_prefix = min_length
-
+                longest_prefix = indices[0].item() if len(indices) > 0 else min_length
                 if longest_prefix > 0:
                     reset = False
                     self.model.n_tokens = longest_prefix
@@ -183,17 +179,13 @@ class LlamacppHF(PreTrainedModel):
 
     @classmethod
     def from_pretrained(cls, pretrained_model_name_or_path: Optional[Union[str, os.PathLike]], *model_args, **kwargs):
-        assert len(model_args) == 0 and len(kwargs) == 0, "extra args is currently not supported"
+        assert not model_args and not kwargs, "extra args is currently not supported"
 
         if isinstance(pretrained_model_name_or_path, str):
             pretrained_model_name_or_path = Path(pretrained_model_name_or_path)
 
         path = Path(f'{shared.args.model_dir}') / Path(pretrained_model_name_or_path)
-        if path.is_file():
-            model_file = path
-        else:
-            model_file = list(path.glob('*.gguf'))[0]
-
+        model_file = path if path.is_file() else list(path.glob('*.gguf'))[0]
         logger.info(f"llama.cpp weights detected: {model_file}\n")
 
         if shared.args.tensor_split is None or shared.args.tensor_split.strip() == '':

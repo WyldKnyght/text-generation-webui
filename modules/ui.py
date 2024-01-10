@@ -97,12 +97,9 @@ def list_model_elements():
         'hqq_backend',
     ]
     if is_torch_xpu_available():
-        for i in range(torch.xpu.device_count()):
-            elements.append(f'gpu_memory_{i}')
+        elements.extend(f'gpu_memory_{i}' for i in range(torch.xpu.device_count()))
     else:
-        for i in range(torch.cuda.device_count()):
-            elements.append(f'gpu_memory_{i}')
-
+        elements.extend(f'gpu_memory_{i}' for i in range(torch.cuda.device_count()))
     return elements
 
 
@@ -188,10 +185,10 @@ def list_interface_input_elements():
 
 
 def gather_interface_values(*args):
-    output = {}
-    for i, element in enumerate(list_interface_input_elements()):
-        output[element] = args[i]
-
+    output = {
+        element: args[i]
+        for i, element in enumerate(list_interface_input_elements())
+    }
     if not shared.args.multi_user:
         shared.persistent_interface_state = output
 
@@ -204,7 +201,7 @@ def apply_interface_values(state, use_persistent=False):
 
     elements = list_interface_input_elements()
     if len(state) == 0:
-        return [gr.update() for k in elements]  # Dummy, do nothing
+        return [gr.update() for _ in elements]
     else:
         return [state[k] if k in state else gr.update() for k in elements]
 
@@ -223,7 +220,7 @@ def save_settings(state, preset, extensions_list, show_controls, theme_state):
     output['default_extensions'] = extensions_list
     output['seed'] = int(output['seed'])
     output['show_controls'] = show_controls
-    output['dark_theme'] = True if theme_state == 'dark' else False
+    output['dark_theme'] = theme_state == 'dark'
 
     # Save extension values in the UI
     for extension_name in extensions_list:

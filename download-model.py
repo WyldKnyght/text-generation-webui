@@ -39,7 +39,7 @@ class ModelDownloader:
         if model[-1] == '/':
             model = model[:-1]
 
-        if model.startswith(base + '/'):
+        if model.startswith(f'{base}/'):
             model = model[len(base) + 1:]
 
         model_parts = model.split(":")

@@ -74,7 +74,7 @@ def load_metadata(fname):
         if GGUF_VERSION == 1:
             raise Exception('You are using an outdated GGUF, please download a new one.')
 
-        for i in range(kv_data_count):
+        for _ in range(kv_data_count):
             key_length = struct.unpack("<Q", file.read(8))[0]
             key = file.read(key_length)
 

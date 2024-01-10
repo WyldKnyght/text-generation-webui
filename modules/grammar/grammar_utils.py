@@ -47,7 +47,7 @@ def get_symbol_id(state, src):
 
 def generate_symbol_id(state, base_name):
     next_id = len(state.symbol_ids)
-    state.symbol_ids[base_name + "_" + str(next_id)] = next_id
+    state.symbol_ids[f"{base_name}_{next_id}"] = next_id
     return next_id
 
 
@@ -84,9 +84,9 @@ def remove_leading_white_space(src, newline_ok):
         if src[pos] == "#":
             while pos < len(src) and src[pos] not in ("\r", "\n"):
                 pos += 1
+        elif not newline_ok and src[pos] in ("\r", "\n"):
+            break
         else:
-            if not newline_ok and src[pos] in ("\r", "\n"):
-                break
             pos += 1
     return src[pos:]
 
@@ -96,7 +96,7 @@ def parse_name(src):
     while pos < len(src) and is_word_char(src[pos]):
         pos += 1
     if pos == 0:
-        raise RuntimeError("expecting name at " + src)
+        raise RuntimeError(f"expecting name at {src}")
     return src[:pos], src[pos:]
 
 
@@ -125,7 +125,7 @@ def parse_char(src):
             return "\n", src[2:]
         elif esc == "t":
             return "\t", src[2:]
-        raise RuntimeError("unknown escape at " + src)
+        raise RuntimeError(f"unknown escape at {src}")
     elif src:
         return src[0], src[1:]
     raise RuntimeError("unexpected end of input")
@@ -186,11 +186,11 @@ def parse_sequence(state, src, rule_name, outbuf, is_nested):
             outbuf.append(REF_RULE_MARKER)
             outbuf.append(sub_rule_id)
             if remaining_src[0] != ")":
-                raise RuntimeError("expecting ')' at " + remaining_src)
+                raise RuntimeError(f"expecting ')' at {remaining_src}")
             remaining_src = remove_leading_white_space(remaining_src[1:], is_nested)
         elif remaining_src[0] in ("*", "+", "?"):  # repetition operator
-            if len(outbuf) - out_start_pos - 1 == 0:
-                raise RuntimeError("expecting preceeding item to */+/? at " + remaining_src)
+            if len(outbuf) - out_start_pos == 1:
+                raise RuntimeError(f"expecting preceeding item to */+/? at {remaining_src}")
             out_grammar = state.grammar_encoding
 
             # apply transformation to previous symbol (last_sym_start -
@@ -257,17 +257,18 @@ def parse_rule(state, src):
     rule_id = get_symbol_id(state, name)
 
     if remaining_src[:3] != "::=":
-        raise RuntimeError("expecting ::= at " + remaining_src)
+        raise RuntimeError(f"expecting ::= at {remaining_src}")
     remaining_src = remove_leading_white_space(remaining_src[3:], True)
 
     remaining_src = parse_alternates(state, remaining_src, name, rule_id, False)
 
-    if remaining_src and remaining_src[0] == "\r":
-        remaining_src = remaining_src[2:] if remaining_src[1] == "\n" else remaining_src[1:]
-    elif remaining_src and remaining_src[0] == "\n":
-        remaining_src = remaining_src[1:]
-    elif remaining_src:
-        raise RuntimeError("expecting newline or end at " + remaining_src)
+    if remaining_src:
+        if remaining_src[0] == "\r":
+            remaining_src = remaining_src[2:] if remaining_src[1] == "\n" else remaining_src[1:]
+        elif remaining_src[0] == "\n":
+            remaining_src = remaining_src[1:]
+        else:
+            raise RuntimeError(f"expecting newline or end at {remaining_src}")
     return remove_leading_white_space(remaining_src, True)
 
 
@@ -307,14 +308,14 @@ def print_rule(file, grammar_encoding, index, symbol_id_names):
                 )
                 pos += 2
             else:
-                print("<{}>[".format(pos), end="", file=file)
+                print(f"<{pos}>[", end="", file=file)
                 num_chars = grammar_encoding[pos]
                 pos += 1
 
                 for i in range(0, num_chars, 2):
-                    print("{}-".format(chr(grammar_encoding[pos + i])), end="", file=file)
+                    print(f"{chr(grammar_encoding[pos + i])}-", end="", file=file)
                     if i + 1 < num_chars:
-                        print("{}".format(chr(grammar_encoding[pos + i + 1])), end="", file=file)
+                        print(f"{chr(grammar_encoding[pos + i + 1])}", end="", file=file)
                 print("]", end=" ", file=file)
                 pos += num_chars
         pos += 1
@@ -396,7 +397,7 @@ class GrammarConstraint(ABC):
     def advance_stack(self, stack):
         stack = list(stack)
         # If the stack is empty, we're done. Because no more tokens should be accepted.
-        if len(stack) == 0:
+        if not stack:
             return [stack]
 
         # Get the top of the stack.
@@ -466,11 +467,12 @@ class IncrementalGrammarConstraint(GrammarConstraint):
 
             # to make pos point to the size of the char range rule
             pos += 1
-            found = False
-            for i in range(0, num_chars, 2):
-                if self.grammar_encoding[pos + i] <= byte and byte <= self.grammar_encoding[pos + i + 1]:
-                    found = True
-                    break
+            found = any(
+                self.grammar_encoding[pos + i]
+                <= byte
+                <= self.grammar_encoding[pos + i + 1]
+                for i in range(0, num_chars, 2)
+            )
             if not found:
                 continue
 
@@ -516,9 +518,9 @@ class IncrementalGrammarConstraint(GrammarConstraint):
         return stacks
 
     def batch_filter_vocab(self, batch_stacks, device):
-        batch_acceptance = []
-        for stacks in batch_stacks:
-            batch_acceptance.append(self.filter_vocab(stacks, device))
+        batch_acceptance = [
+            self.filter_vocab(stacks, device) for stacks in batch_stacks
+        ]
         return torch.stack(batch_acceptance)
 
     def filter_vocab(self, stacks, device):
@@ -526,7 +528,7 @@ class IncrementalGrammarConstraint(GrammarConstraint):
             # Handle the empty case: for example, return a tensor of False
             # The size of the tensor should match the size of your vocabulary
             vocab_size = len(self.token_trie)
-            logger.debug(f"sum of acceptance: {0}")
+            logger.debug('sum of acceptance: 0')
             return torch.zeros(vocab_size, dtype=torch.bool, device=device)
 
         acceptance_matrix = torch.cat([self.token_acceptance_for_stack(tuple(stack), device) for stack in stacks])
@@ -560,8 +562,8 @@ class IncrementalGrammarConstraint(GrammarConstraint):
         stack = list(stack)  # needs to come in as a tuple for lru_cache
 
         accepts = [False] * len(self.token_trie)
-        accepts[self.eos_token_id] = len(stack) == 0
-        if len(stack) == 0:
+        accepts[self.eos_token_id] = not stack
+        if not stack:
             logger.debug("empty stack")
 
         def traverse_trie(trie, stacks):

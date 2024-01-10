@@ -162,13 +162,16 @@ def create_interface():
         shared.gradio['interface'].launch(
             prevent_thread_lock=True,
             share=shared.args.share,
-            server_name=None if not shared.args.listen else (shared.args.listen_host or '0.0.0.0'),
+            server_name=None
+            if not shared.args.listen
+            else (shared.args.listen_host or '0.0.0.0'),
             server_port=shared.args.listen_port,
             inbrowser=shared.args.auto_launch,
             auth=auth or None,
-            ssl_verify=False if (shared.args.ssl_keyfile or shared.args.ssl_certfile) else True,
+            ssl_verify=not shared.args.ssl_keyfile
+            and not shared.args.ssl_certfile,
             ssl_keyfile=shared.args.ssl_keyfile,
-            ssl_certfile=shared.args.ssl_certfile
+            ssl_certfile=shared.args.ssl_certfile,
         )
 
 
@@ -247,7 +250,7 @@ if __name__ == "__main__":
     if shared.args.nowebui:
         # Start the API in standalone mode
         shared.args.extensions = [x for x in shared.args.extensions if x != 'gallery']
-        if shared.args.extensions is not None and len(shared.args.extensions) > 0:
+        if shared.args.extensions is not None and shared.args.extensions:
             extensions_module.load_extensions()
     else:
         # Launch the web UI

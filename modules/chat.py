@@ -170,7 +170,7 @@ def generate_chat_prompt(user_input, state, **kwargs):
 
     # Handle truncation
     max_length = get_max_prompt_length(state)
-    while len(messages) > 0 and get_encoded_length(prompt) > max_length:
+    while messages and get_encoded_length(prompt) > max_length:
         # Try to save the system message
         if len(messages) > 1 and messages[0]['role'] == 'system':
             messages.pop(1)
@@ -227,7 +227,24 @@ def chatbot_wrapper(text, state, regenerate=False, _continue=False, loading_mess
     is_stream = state['stream']
 
     # Prepare the input
-    if not (regenerate or _continue):
+    if regenerate or _continue:
+        text, visible_text = output['internal'][-1][0], output['visible'][-1][0]
+        if regenerate:
+            if loading_message:
+                yield {
+                    'visible': output['visible'][:-1] + [[visible_text, shared.processing_message]],
+                    'internal': output['internal'][:-1] + [[text, '']]
+                }
+        elif _continue:
+            last_reply = [output['internal'][-1][1], output['visible'][-1][1]]
+            if loading_message:
+                yield {
+                    'visible': output['visible'][:-1]
+                    + [[visible_text, f'{last_reply[1]}...']],
+                    'internal': output['internal'],
+                }
+
+    else:
         visible_text = html.escape(text)
 
         # Apply extensions
@@ -243,22 +260,6 @@ def chatbot_wrapper(text, state, regenerate=False, _continue=False, loading_mess
                 'visible': output['visible'][:-1] + [[output['visible'][-1][0], shared.processing_message]],
                 'internal': output['internal']
             }
-    else:
-        text, visible_text = output['internal'][-1][0], output['visible'][-1][0]
-        if regenerate:
-            if loading_message:
-                yield {
-                    'visible': output['visible'][:-1] + [[visible_text, shared.processing_message]],
-                    'internal': output['internal'][:-1] + [[text, '']]
-                }
-        elif _continue:
-            last_reply = [output['internal'][-1][1], output['visible'][-1][1]]
-            if loading_message:
-                yield {
-                    'visible': output['visible'][:-1] + [[visible_text, last_reply[1] + '...']],
-                    'internal': output['internal']
-                }
-
     if shared.model_name == 'None' or shared.model is None:
         raise ValueError("No model is loaded! Select one in the Model tab.")
 
@@ -292,7 +293,7 @@ def chatbot_wrapper(text, state, regenerate=False, _continue=False, loading_mess
             output['visible'][-1] = [visible_text, last_reply[1] + visible_reply]
             if is_stream:
                 yield output
-        elif not (j == 0 and visible_reply.strip() == ''):
+        elif j != 0 or visible_reply.strip() != '':
             output['internal'][-1] = [text, reply.lstrip(' ')]
             output['visible'][-1] = [visible_text, visible_reply.lstrip(' ')]
             if is_stream:
@@ -314,7 +315,7 @@ def impersonate_wrapper(text, state):
     prompt = generate_chat_prompt('', state, impersonate=True)
     stopping_strings = get_stopping_strings(state)
 
-    yield text + '...', static_output
+    yield (f'{text}...', static_output)
     reply = None
     for reply in generate_reply(prompt + text, state, stopping_strings=stopping_strings, is_chat=True):
         yield (text + reply).lstrip(' '), static_output
@@ -323,26 +324,31 @@ def impersonate_wrapper(text, state):
 
 
 def generate_chat_reply(text, state, regenerate=False, _continue=False, loading_message=True, for_ui=False):
-    history = state['history']
     if regenerate or _continue:
         text = ''
+        history = state['history']
         if (len(history['visible']) == 1 and not history['visible'][0][0]) or len(history['internal']) == 0:
             yield history
             return
 
-    for history in chatbot_wrapper(text, state, regenerate=regenerate, _continue=_continue, loading_message=loading_message, for_ui=for_ui):
-        yield history
+    yield from chatbot_wrapper(
+        text,
+        state,
+        regenerate=regenerate,
+        _continue=_continue,
+        loading_message=loading_message,
+        for_ui=for_ui,
+    )
 
 
 def character_is_loaded(state, raise_exception=False):
-    if state['mode'] in ['chat', 'chat-instruct'] and state['name2'] == '':
-        logger.error('It looks like no character is loaded. Please load one under Parameters > Character.')
-        if raise_exception:
-            raise ValueError
-
-        return False
-    else:
+    if state['mode'] not in ['chat', 'chat-instruct'] or state['name2'] != '':
         return True
+    logger.error('It looks like no character is loaded. Please load one under Parameters > Character.')
+    if raise_exception:
+        raise ValueError
+
+    return False
 
 
 def generate_chat_reply_wrapper(text, state, regenerate=False, _continue=False):
@@ -362,7 +368,7 @@ def generate_chat_reply_wrapper(text, state, regenerate=False, _continue=False):
         send_dummy_message(text, state)
         send_dummy_reply(state['start_with'], state)
 
-    for i, history in enumerate(generate_chat_reply(text, state, regenerate, _continue, loading_message=True, for_ui=True)):
+    for history in generate_chat_reply(text, state, regenerate, _continue, loading_message=True, for_ui=True):
         yield chat_html_wrapper(history, state['name1'], state['name2'], state['mode'], state['chat_style'], state['character_menu']), history
 
 
@@ -404,7 +410,7 @@ def send_dummy_message(text, state):
 
 def send_dummy_reply(text, state):
     history = state['history']
-    if len(history['visible']) > 0 and not history['visible'][-1][1] == '':
+    if len(history['visible']) > 0 and history['visible'][-1][1] != '':
         history['visible'].append(['', ''])
         history['internal'].append(['', ''])
 
@@ -434,12 +440,11 @@ def start_new_chat(state):
 
 
 def get_history_file_path(unique_id, character, mode):
-    if mode == 'instruct':
-        p = Path(f'logs/instruct/{unique_id}.json')
-    else:
-        p = Path(f'logs/chat/{character}/{unique_id}.json')
-
-    return p
+    return (
+        Path(f'logs/instruct/{unique_id}.json')
+        if mode == 'instruct'
+        else Path(f'logs/chat/{character}/{unique_id}.json')
+    )
 
 
 def save_history(history, unique_id, character, mode):
@@ -510,12 +515,11 @@ def load_latest_history(state):
 
     histories = find_all_histories(state)
 
-    if len(histories) > 0:
-        history = load_history(histories[0], state['character_menu'], state['mode'])
-    else:
-        history = start_new_chat(state)
-
-    return history
+    return (
+        load_history(histories[0], state['character_menu'], state['mode'])
+        if len(histories) > 0
+        else start_new_chat(state)
+    )
 
 
 def load_history_after_deletion(state, idx):
@@ -551,15 +555,11 @@ def load_history(unique_id, character, mode):
     p = get_history_file_path(unique_id, character, mode)
 
     f = json.loads(open(p, 'rb').read())
-    if 'internal' in f and 'visible' in f:
-        history = f
-    else:
-        history = {
-            'internal': f['data'],
-            'visible': f['data_visible']
-        }
-
-    return history
+    return (
+        f
+        if 'internal' in f and 'visible' in f
+        else {'internal': f['data'], 'visible': f['data_visible']}
+    )
 
 
 def load_history_json(file, history):

@@ -23,8 +23,7 @@ def input_modifier_internal(string, collector, is_chat):
 
     # Find the user input
     pattern = re.compile(r"<\|begin-user-input\|>(.*?)<\|end-user-input\|>", re.DOTALL)
-    match = re.search(pattern, string)
-    if match:
+    if match := re.search(pattern, string):
         # Preprocess the user prompt.
         user_input = match.group(1).strip()
         user_input = preprocess_text(user_input)

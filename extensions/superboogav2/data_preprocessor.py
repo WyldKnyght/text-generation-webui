@@ -109,8 +109,9 @@ class TextPreprocessorBuilder:
         In the English language, adverbs and interjections rarely provide meaningul information.
         Removing them improves the embedding precision. Don't tell JK Rowling, though.
         """
-        processed_text = TextPreprocessorBuilder._pos_remove_cache.get(self.text)
-        if processed_text:
+        if processed_text := TextPreprocessorBuilder._pos_remove_cache.get(
+            self.text
+        ):
             self.text = processed_text
             return self
 
@@ -136,11 +137,12 @@ class TextPreprocessorBuilder:
         return self
 
     def lemmatize(self):
-        processed_text = TextPreprocessorBuilder._lemmatizer_cache.get(self.text)
-        if processed_text:
+        if processed_text := TextPreprocessorBuilder._lemmatizer_cache.get(
+            self.text
+        ):
             self.text = processed_text
             return self
-        
+
         new_text = "".join([TextPreprocessorBuilder._lemmatizer.lemmatize(word) for word in re.findall(r'\b\w+\b|\W+', self.text)])
         TextPreprocessorBuilder._lemmatizer_cache[self.text] = new_text
         self.text = new_text

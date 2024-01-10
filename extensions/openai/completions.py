@@ -29,7 +29,7 @@ class LogitsBiasProcessor(LogitsProcessor):
     def __init__(self, logit_bias={}):
         self.logit_bias = logit_bias
         if self.logit_bias:
-            self.keys = list([int(key) for key in self.logit_bias.keys()])
+            self.keys = [int(key) for key in self.logit_bias.keys()]
             values = [self.logit_bias[str(key)] for key in self.keys]
             self.values = torch.tensor(values, dtype=torch.float, device=shared.model.device)
             debug_msg(f"{self})")
@@ -99,8 +99,7 @@ def process_parameters(body, is_legacy=False):
             generate_params['custom_stopping_strings'] = body['stop']
 
     logits_processor = []
-    logit_bias = body.get('logit_bias', None)
-    if logit_bias:  # {str: float, ...}
+    if logit_bias := body.get('logit_bias', None):
         # XXX convert tokens from tiktoken based on requested model
         # Ex.: 'logit_bias': {'1129': 100, '11442': 100, '16243': 100}
         try:
@@ -108,7 +107,7 @@ def process_parameters(body, is_legacy=False):
             new_logit_bias = {}
             for logit, bias in logit_bias.items():
                 for x in encode(encoder.decode([int(logit)]), add_special_tokens=False)[0]:
-                    if int(x) in [0, 1, 2, 29871]:  # XXX LLAMA tokens
+                    if int(x) in {0, 1, 2, 29871}:  # XXX LLAMA tokens
                         continue
 
                     new_logit_bias[str(int(x))] = bias
@@ -166,13 +165,7 @@ def convert_history(history):
 
         role = entry["role"]
 
-        if role == "user":
-            user_input = content
-            if current_message:
-                chat_dialogue.append([current_message, ''])
-                current_message = ""
-            current_message = content
-        elif role == "assistant":
+        if role == "assistant":
             current_reply = content
             if current_message:
                 chat_dialogue.append([current_message, current_reply])
@@ -183,6 +176,12 @@ def convert_history(history):
         elif role == "system":
             system_message = content
 
+        elif role == "user":
+            user_input = content
+            if current_message:
+                chat_dialogue.append([current_message, ''])
+                current_message = ""
+            current_message = content
     # if current_message:
     #     chat_dialogue.append([current_message, ''])
 
@@ -314,9 +313,7 @@ def chat_completions_common(body: dict, is_legacy: bool = False, stream=False) -
                 continue
 
             seen_content = answer
-            chunk = chat_streaming_chunk(new_content)
-            yield chunk
-
+            yield chat_streaming_chunk(new_content)
     completion_token_count = len(encode(answer)[0])
     stop_reason = "stop"
     if token_count + completion_token_count >= generate_params['truncation_length'] or completion_token_count >= generate_params['max_new_tokens']:
@@ -427,7 +424,7 @@ def completions_common(body: dict, is_legacy: bool = False, stream=False):
 
             resp_list_data.extend([respi])
 
-        resp = {
+        yield {
             "id": cmpl_id,
             "object": object_type,
             "created": created_time,
@@ -436,11 +433,10 @@ def completions_common(body: dict, is_legacy: bool = False, stream=False):
             "usage": {
                 "prompt_tokens": total_prompt_token_count,
                 "completion_tokens": total_completion_token_count,
-                "total_tokens": total_prompt_token_count + total_completion_token_count
-            }
+                "total_tokens": total_prompt_token_count
+                + total_completion_token_count,
+            },
         }
-
-        yield resp
     else:
         prompt = body[prompt_str]
         if isinstance(prompt, list):
@@ -518,8 +514,7 @@ def chat_completions(body: dict, is_legacy: bool = False) -> dict:
 
 
 def stream_chat_completions(body: dict, is_legacy: bool = False):
-    for resp in chat_completions_common(body, is_legacy, stream=True):
-        yield resp
+    yield from chat_completions_common(body, is_legacy, stream=True)
 
 
 def completions(body: dict, is_legacy: bool = False) -> dict:
@@ -528,5 +523,4 @@ def completions(body: dict, is_legacy: bool = False) -> dict:
 
 
 def stream_completions(body: dict, is_legacy: bool = False):
-    for resp in completions_common(body, is_legacy, stream=True):
-        yield resp
+    yield from completions_common(body, is_legacy, stream=True)

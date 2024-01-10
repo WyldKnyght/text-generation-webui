@@ -26,7 +26,6 @@ except ModuleNotFoundError:
         'Try installing flash-attention following the instructions here: '
         'https://github.com/Dao-AILab/flash-attention#installation-and-features'
     )
-    pass
 except Exception:
     logger.warning('Failed to load flash-attention due to the following error:\n')
     traceback.print_exc()
@@ -77,7 +76,7 @@ class Exllamav2HF(PreTrainedModel):
         labels = kwargs.get('labels', None)
         past_key_values = kwargs.get('past_key_values', None)
 
-        if len(args) > 0:
+        if args:
             if not shared.args.cfg_cache:
                 logger.error("Please enable the cfg-cache option to use CFG with ExLlamav2_HF.")
                 return
@@ -104,11 +103,7 @@ class Exllamav2HF(PreTrainedModel):
             if past_seq is not None:
                 min_length = min(past_seq.shape[0], seq_tensor.shape[0])
                 indices = torch.nonzero(~torch.eq(past_seq[:min_length], seq_tensor[:min_length]))
-                if len(indices) > 0:
-                    longest_prefix = indices[0].item()
-                else:
-                    longest_prefix = min_length
-
+                longest_prefix = indices[0].item() if len(indices) > 0 else min_length
                 if longest_prefix > 0:
                     reset = False
                     ex_cache.current_seq_len = longest_prefix
@@ -151,7 +146,7 @@ class Exllamav2HF(PreTrainedModel):
 
     @classmethod
     def from_pretrained(cls, pretrained_model_name_or_path: Optional[Union[str, os.PathLike]], *model_args, **kwargs):
-        assert len(model_args) == 0 and len(kwargs) == 0, "extra args is currently not supported"
+        assert not model_args and not kwargs, "extra args is currently not supported"
         if isinstance(pretrained_model_name_or_path, str):
             pretrained_model_name_or_path = Path(pretrained_model_name_or_path)
 

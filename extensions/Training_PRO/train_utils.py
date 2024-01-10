@@ -19,8 +19,7 @@ def list_subfoldersByTime(directory):
 
     if not directory.endswith('/'):
         directory += '/'
-    subfolders = []
-    subfolders.append('None') 
+    subfolders = ['None']
     path = directory
     name_list = os.listdir(path)
     full_list = [os.path.join(path,i) for i in name_list]
@@ -40,12 +39,11 @@ def get_available_loras_local(_sortedByTime):
     
     model_dir = shared.args.lora_dir  # Update with the appropriate directory path
     subfolders = []
-    if _sortedByTime:
-        subfolders = list_subfoldersByTime(model_dir)
-    else:
-        subfolders = utils.get_available_loras()        
-
-    return subfolders
+    return (
+        list_subfoldersByTime(model_dir)
+        if _sortedByTime
+        else utils.get_available_loras()
+    )
 
 
 # FPHAM SPLIT BY SENTENCE BLOCK ===============
@@ -102,9 +100,9 @@ def split_sentences(text: str, cutoff_len: int):
 def precise_cut(text: str, overlap: bool, min_chars_cut: int, eos_to_hc: bool, cutoff_len: int, hard_cut_string: str, debug_slicer:bool):
 
     EOSX_str = '<//>' #hardcut placeholder
-    EOS_str = '</s>' 
+    EOS_str = '</s>'
     print("Precise raw text slicer: ON")
-    
+
     cut_string = hard_cut_string.replace('\\n', '\n')
     text = text.replace(cut_string, EOSX_str)
     sentences = split_sentences(text, cutoff_len)
@@ -121,7 +119,7 @@ def precise_cut(text: str, overlap: bool, min_chars_cut: int, eos_to_hc: bool, c
     half_index = 0
 
     for index, item in enumerate(sentences):
-        
+
         if halfcut_length+ item['size'] < half_cut:
             halfcut_length += item['size']
             half_index = index
@@ -141,7 +139,7 @@ def precise_cut(text: str, overlap: bool, min_chars_cut: int, eos_to_hc: bool, c
             currentSentence = item['text']
             totalLength = item['size']
             halfcut_length = item['size']
-            
+
     if len(currentSentence.strip()) > min_chars_cut:    
         sentencelist.append(currentSentence.strip())
 
@@ -166,11 +164,11 @@ def precise_cut(text: str, overlap: bool, min_chars_cut: int, eos_to_hc: bool, c
                     # otherwise don't cross hard cut    
                     elif EOSX_str not in currentSentence and len(currentSentence.strip()) > min_chars_cut:
                         sentencelist.append(currentSentence.strip())
-                    
+
                     currentSentence = ''
                     totalLength = 0
                     break
-        
+
         print(f"+ Overlapping blocks: {len(sentencelist)-unique_blocks}")
 
     num_EOS = 0
@@ -179,7 +177,7 @@ def precise_cut(text: str, overlap: bool, min_chars_cut: int, eos_to_hc: bool, c
             sentencelist[i] = sentencelist[i].replace(EOSX_str, EOS_str)
         else:
             sentencelist[i] = sentencelist[i].replace(EOSX_str, '')
-        
+
         #someone may have had stop strings in the raw text...
         sentencelist[i] = sentencelist[i].replace("</s></s>", EOS_str)
         num_EOS += sentencelist[i].count(EOS_str)
@@ -195,45 +193,45 @@ def precise_cut(text: str, overlap: bool, min_chars_cut: int, eos_to_hc: bool, c
     if debug_slicer:
                     # Write the log file
         Path('logs').mkdir(exist_ok=True)
-        sentencelist_dict = {index: sentence for index, sentence in enumerate(sentencelist)}
+        sentencelist_dict = dict(enumerate(sentencelist))
         output_file = "logs/sentencelist.json"
         with open(output_file, 'w') as f:
             json.dump(sentencelist_dict, f,indent=2)
-        
+
         print("Saved sentencelist.json in logs folder")
-    
+
     return sentencelist   
 
 
 def sliding_block_cut(text: str, min_chars_cut: int, eos_to_hc: bool, cutoff_len: int, hard_cut_string: str, debug_slicer:bool):
 
     EOSX_str = '<//>' #hardcut placeholder
-    EOS_str = '</s>' 
+    EOS_str = '</s>'
     print("Mega Block Overlap: ON")
-    
+
     cut_string = hard_cut_string.replace('\\n', '\n')
     text = text.replace(cut_string, EOSX_str)
     sentences = split_sentences(text, cutoff_len)
 
     print(f"Sentences: {len(sentences)}")
     sentencelist = []
-    
+
     max_cut = cutoff_len-1
 
     #print(f"max_cut: {max_cut}")
     advancing_to = 0
 
     prev_block_lastsentence = ""
-    
+
 
     for i in range(len(sentences)):
         totalLength = 0
         currentSentence = ''
         lastsentence = ""
-        
+
         if i >= advancing_to:
             for k in range(i, len(sentences)):
-                
+
                 current_length = sentences[k]['size']
 
                 if totalLength + current_length <= max_cut and not currentSentence.endswith(EOSX_str):
@@ -245,7 +243,7 @@ def sliding_block_cut(text: str, min_chars_cut: int, eos_to_hc: bool, cutoff_len
                         if prev_block_lastsentence!=lastsentence:
                             sentencelist.append(currentSentence.strip())
                             prev_block_lastsentence = lastsentence
-                        
+
                     advancing_to = 0
                     if currentSentence.endswith(EOSX_str):
                         advancing_to = k
@@ -253,7 +251,7 @@ def sliding_block_cut(text: str, min_chars_cut: int, eos_to_hc: bool, cutoff_len
                     currentSentence = ""
                     totalLength = 0
                     break
-            
+
             if currentSentence != "":
                 if len(currentSentence.strip()) > min_chars_cut:
                     sentencelist.append(currentSentence.strip())
@@ -266,7 +264,7 @@ def sliding_block_cut(text: str, min_chars_cut: int, eos_to_hc: bool, cutoff_len
             sentencelist[i] = sentencelist[i].replace(EOSX_str, EOS_str)
         else:
             sentencelist[i] = sentencelist[i].replace(EOSX_str, '')
-        
+
         #someone may have had stop strings in the raw text...
         sentencelist[i] = sentencelist[i].replace("</s></s>", EOS_str)
         num_EOS += sentencelist[i].count(EOS_str)
@@ -282,13 +280,13 @@ def sliding_block_cut(text: str, min_chars_cut: int, eos_to_hc: bool, cutoff_len
     if debug_slicer:
                     # Write the log file
         Path('logs').mkdir(exist_ok=True)
-        sentencelist_dict = {index: sentence for index, sentence in enumerate(sentencelist)}
+        sentencelist_dict = dict(enumerate(sentencelist))
         output_file = "logs/sentencelist.json"
         with open(output_file, 'w') as f:
             json.dump(sentencelist_dict, f,indent=2)
-        
+
         print("Saved sentencelist.json in logs folder")
-    
+
     return sentencelist   
 
 # Example usage:
@@ -326,24 +324,24 @@ def download_file_from_url(url, overwrite, output_dir_in, valid_extensions = {'.
 
         # Send an HTTP GET request to the URL with a timeout
         file_extension = os.path.splitext(filename_lower)[-1]
-        
+
         if file_extension not in valid_extensions:
             yield f"Invalid file extension: {file_extension}. Only {valid_extensions} files are supported."
             return
 
         with session.get(url, stream=True, headers=headers, timeout=10) as r:
-            r.raise_for_status() 
+            r.raise_for_status()
             # total size can be wildly inaccurate
             #total_size = int(r.headers.get('content-length', 0))
-            
-            block_size = 1024 * 4  
+
+            block_size = 1024 * 4
             with open(local_filename, mode) as f:
                 count = 0
                 for data in r.iter_content(block_size):
                     f.write(data)
                     count += len(data)
 
-                    yield f"Downloaded: {count} " + overw
+                    yield f"Downloaded: {count} {overw}"
 
             # Verify file size if possible
             if os.path.exists(local_filename):
@@ -353,7 +351,7 @@ def download_file_from_url(url, overwrite, output_dir_in, valid_extensions = {'.
                     print("File Downloaded")
                 else:
                     print("Downloaded file is zero")
-                    yield f"Failed. Downloaded file size is zero)."
+                    yield "Failed. Downloaded file size is zero)."
             else:
                 print(f"Error: {local_filename} failed to download.")
                 yield f"Error: {local_filename} failed to download"

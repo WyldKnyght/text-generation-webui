@@ -37,10 +37,7 @@ class CtransformersModel:
         return shared.args.model_type is None or shared.args.model_type == "Auto" or shared.args.model_type == "None"
 
     def model_dir(self, path):
-        if path.is_file():
-            return path.parent
-
-        return path
+        return path.parent if path.is_file() else path
 
     def encode(self, string, **kwargs):
         return self.model.tokenize(string)

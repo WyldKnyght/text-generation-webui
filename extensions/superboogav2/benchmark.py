@@ -20,12 +20,12 @@ def benchmark(config_path, collector):
     # Get the current system date
     sysdate = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
     filename = f"benchmark_{sysdate}.txt"
-    
+
     # Open the log file in append mode
     with open(filename, 'a') as log:
         with open(config_path, 'r') as f:
             data = json.load(f)
-        
+
         total_points = 0
         max_points = 0
 
@@ -33,19 +33,17 @@ def benchmark(config_path, collector):
             filepath = item["text"]
             corpus = ""
 
-            # Check if the file exists
-            if os.path.isfile(Path(filepath)):
-                # Open the file and read its content
-                with open(Path(filepath), 'r') as file:
-                    corpus = file.read()
-                process_and_add_to_collector(corpus, collector, True, create_metadata_source('benchmark'))
-            else:
+            if not os.path.isfile(Path(filepath)):
                 raise f'Cannot find specified file {filepath}.'
 
+            # Open the file and read its content
+            with open(Path(filepath), 'r') as file:
+                corpus = file.read()
+            process_and_add_to_collector(corpus, collector, True, create_metadata_source('benchmark'))
             for question_group in item["questions"]:
                 question_variants = question_group["question_variants"]
                 criteria = question_group["criteria"]
-                
+
                 for q in question_variants:
                     max_points += len(criteria)
                     processed_text = preprocess_text(q)
@@ -54,7 +52,7 @@ def benchmark(config_path, collector):
                     results = collector.get_sorted_by_dist(processed_text, n_results=get_chunk_count(), max_token_count=get_max_token_count())
 
                     points = 0
-                    
+
                     for c in criteria:
                         for p in results:
                             if c in p:

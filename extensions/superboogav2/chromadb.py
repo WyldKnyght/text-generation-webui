@@ -66,22 +66,20 @@ class Info:
         s2 = other_info.text_with_context
         s1_start = self.start_index
         s2_start = other_info.start_index
-        
+
         new_dist = self.calculate_distance(other_info)
 
         if self.should_merge(s1, s2, s1_start, s2_start):
             if s1_start <= s2_start:
-                if s1_start + len(s1) >= s2_start + len(s2):  # if s1 completely covers s2
+                if s1_start + len(s1) >= s2_start + len(s2):
                     return Info(s1_start, s1, new_dist, self.id)
-                else:
-                    overlap = max(0, s1_start + len(s1) - s2_start)
-                    return Info(s1_start, s1 + s2[overlap:], new_dist, self.id)
+                overlap = max(0, s1_start + len(s1) - s2_start)
+                return Info(s1_start, s1 + s2[overlap:], new_dist, self.id)
             else:
-                if s2_start + len(s2) >= s1_start + len(s1):  # if s2 completely covers s1
+                if s2_start + len(s2) >= s1_start + len(s1):
                     return Info(s2_start, s2, new_dist, other_info.id)
-                else:
-                    overlap = max(0, s2_start + len(s2) - s1_start)
-                    return Info(s2_start, s2 + s1[overlap:], new_dist, other_info.id)
+                overlap = max(0, s2_start + len(s2) - s1_start)
+                return Info(s2_start, s2 + s1[overlap:], new_dist, other_info.id)
 
         return None
     
@@ -90,8 +88,8 @@ class Info:
         # Check if s1 and s2 are adjacent or overlapping
         s1_end = s1_start + len(s1)
         s2_end = s2_start + len(s2)
-        
-        return not (s1_end < s2_start or s2_end < s1_start)
+
+        return s1_end >= s2_start and s2_end >= s1_start
 
 class ChromaCollector(Collecter):
     def __init__(self, embedder: Embedder):
@@ -107,14 +105,14 @@ class ChromaCollector(Collecter):
     def add(self, texts: list[str], texts_with_context: list[str], starting_indices: list[int], metadatas: list[dict] = None):
         with self.lock:
             assert metadatas is None or len(metadatas) == len(texts), "metadatas must be None or have the same length as texts"
-            
-            if len(texts) == 0: 
+
+            if not texts: 
                 return
 
             new_ids = self._get_new_ids(len(texts))
 
             (existing_texts, existing_embeddings, existing_ids, existing_metas), \
-            (non_existing_texts, non_existing_ids, non_existing_metas) = self._split_texts_by_cache_hit(texts, new_ids, metadatas)
+                (non_existing_texts, non_existing_ids, non_existing_metas) = self._split_texts_by_cache_hit(texts, new_ids, metadatas)
 
             # If there are any already existing texts, add them all at once.
             if existing_texts:
@@ -155,8 +153,7 @@ class ChromaCollector(Collecter):
         for i, text in enumerate(texts):
             id_ = new_ids[i]
             metadata = metadatas[i] if metadatas is not None else None
-            embedding = self.embeddings_cache.get(text)
-            if embedding:
+            if embedding := self.embeddings_cache.get(text):
                 existing_texts.append(text)
                 existing_embeddings.append(embedding)
                 existing_ids.append(id_)
@@ -167,15 +164,11 @@ class ChromaCollector(Collecter):
                 non_existing_metas.append(metadata)
 
         return (existing_texts, existing_embeddings, existing_ids, existing_metas), \
-               (non_existing_texts, non_existing_ids, non_existing_metas)
+                   (non_existing_texts, non_existing_ids, non_existing_metas)
 
 
     def _get_new_ids(self, num_new_ids: int):
-        if self.ids:
-            max_existing_id = max(int(id_) for id_ in self.ids)
-        else:
-            max_existing_id = -1
-
+        max_existing_id = max(int(id_) for id_ in self.ids) if self.ids else -1
         return [str(i + max_existing_id + 1) for i in range(num_new_ids)]
 
     

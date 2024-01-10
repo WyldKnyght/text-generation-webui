@@ -52,8 +52,7 @@ def _feed_file_into_collector(file):
 
 
 def _feed_url_into_collector(urls):
-    for i in feed_url_into_collector(urls, collector):
-        yield i
+    yield from feed_url_into_collector(urls, collector)
     yield '### Done.'
 
 

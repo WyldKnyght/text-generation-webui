@@ -218,7 +218,7 @@ def do_copy_params(lora_name: str, *args):
     else:
         params = {}
 
-    result = list()
+    result = []
     for i in range(0, len(PARAMETERS)):
         key = PARAMETERS[i]
         if key in params:
@@ -237,10 +237,7 @@ def change_rank_limit(use_higher_ranks: bool):
 def clean_path(base_path: str, path: str):
     """Strips unusual symbols and forcibly builds a path as relative to the intended directory."""
     path = path.replace('\\', '/').replace('..', '_')
-    if base_path is None:
-        return path
-
-    return f'{Path(base_path).absolute()}/{path}'
+    return path if base_path is None else f'{Path(base_path).absolute()}/{path}'
 
 
 def backup_adapter(input_folder):
@@ -269,7 +266,7 @@ def backup_adapter(input_folder):
                 if file.is_file():
                     shutil.copy2(file, subfolder_path)
     except Exception as e:
-        print("An error occurred in backup_adapter:", str(e))
+        print("An error occurred in backup_adapter:", e)
 
 
 def calc_trainable_parameters(model):
@@ -341,7 +338,7 @@ def do_train(lora_name: str, always_override: bool, q_proj_en: bool, v_proj_en: 
 
     # Populate target_modules list with chosen X_proj modules. Llama-based models only atm, non-llama will revert to default behavior.
     def list_target_modules(model_id):
-        if model_id != "llama" and model_id != "mistral":
+        if model_id not in ["llama", "mistral"]:
             return model_to_lora_modules[model_id]
 
         available_modules = {
@@ -368,7 +365,7 @@ def do_train(lora_name: str, always_override: bool, q_proj_en: bool, v_proj_en: 
 
     def tokenize(prompt, append_eos_token=False):
 
-        if train_only_after == '' or train_only_after not in prompt:
+        if not train_only_after or train_only_after not in prompt:
             input_ids = encode(prompt, True)
 
             if append_eos_token and input_ids[-1] != shared.tokenizer.eos_token_id and len(input_ids) < cutoff_len:
@@ -455,11 +452,11 @@ def do_train(lora_name: str, always_override: bool, q_proj_en: bool, v_proj_en: 
         del text_chunks
         eval_data = None
     else:
-        if dataset in ['None', '']:
+        if dataset in {'None', ''}:
             yield "Missing dataset choice input, cannot continue."
             return
 
-        if format in ['None', '']:
+        if format in {'None', ''}:
             yield "Missing format choice input, cannot continue."
             return
 
@@ -475,7 +472,11 @@ def do_train(lora_name: str, always_override: bool, q_proj_en: bool, v_proj_en: 
 
         def generate_prompt(data_point: dict[str, str]):
             for options, data in format_data.items():
-                if set(options.split(',')) == set(x[0] for x in data_point.items() if (type(x[1]) is str and len(x[1].strip()) > 0)):
+                if set(options.split(',')) == {
+                    x[0]
+                    for x in data_point.items()
+                    if (type(x[1]) is str and len(x[1].strip()) > 0)
+                }:
                     for key, val in data_point.items():
                         if type(val) is str:
                             data = data.replace(f'%{key}%', val)
@@ -555,7 +556,7 @@ def do_train(lora_name: str, always_override: bool, q_proj_en: bool, v_proj_en: 
         from alpaca_lora_4bit.autograd_4bit import Autograd4bitQuantLinear
         from alpaca_lora_4bit.models import Linear4bitLt
         for _, m in lora_model.named_modules():
-            if isinstance(m, Autograd4bitQuantLinear) or isinstance(m, Linear4bitLt):
+            if isinstance(m, (Autograd4bitQuantLinear, Linear4bitLt)):
                 if m.is_v1_model:
                     m.zeros = m.zeros.half()
                 m.scales = m.scales.half()
@@ -616,23 +617,26 @@ def do_train(lora_name: str, always_override: bool, q_proj_en: bool, v_proj_en: 
             warmup_steps=math.ceil(warmup_steps / gradient_accumulation_steps),
             num_train_epochs=epochs,
             learning_rate=actual_lr,
-            fp16=False if shared.args.cpu or shared.args.bf16 else True,
+            fp16=not shared.args.cpu and not shared.args.bf16,
             bf16=shared.args.bf16,
             optim=optimizer,
             logging_steps=2 if stop_at_loss > 0 else 5,
             evaluation_strategy="steps" if eval_data is not None else "no",
-            eval_steps=math.ceil(eval_steps / gradient_accumulation_steps) if eval_data is not None else None,
+            eval_steps=math.ceil(eval_steps / gradient_accumulation_steps)
+            if eval_data is not None
+            else None,
             save_strategy="steps" if eval_data is not None else "no",
             output_dir=lora_file_path,
             lr_scheduler_type=lr_scheduler_type,
             load_best_model_at_end=eval_data is not None,
-            # TODO: Enable multi-device support
             ddp_find_unused_parameters=None,
             no_cuda=shared.args.cpu,
-            use_ipex=True if is_torch_xpu_available() and not shared.args.cpu else False
+            use_ipex=bool(is_torch_xpu_available() and not shared.args.cpu),
         ),
-        data_collator=transformers.DataCollatorForLanguageModeling(shared.tokenizer, mlm=False),
-        callbacks=list([Callbacks()])
+        data_collator=transformers.DataCollatorForLanguageModeling(
+            shared.tokenizer, mlm=False
+        ),
+        callbacks=[Callbacks()],
     )
 
     lora_model.config.use_cache = False
@@ -721,11 +725,7 @@ def do_train(lora_name: str, always_override: bool, q_proj_en: bool, v_proj_en: 
                 total_time_estimate = 999
             else:
                 its = tracked.current_steps / time_elapsed
-                if its > 1:
-                    timer_info = f"`{its:.2f}` it/s"
-                else:
-                    timer_info = f"`{1.0/its:.2f}` s/it"
-
+                timer_info = f"`{its:.2f}` it/s" if its > 1 else f"`{1.0 / its:.2f}` s/it"
                 total_time_estimate = (1.0 / its) * (tracked.max_steps)
 
             yield f"Running... **{tracked.current_steps}** / **{tracked.max_steps}** ... {timer_info}, {format_time(time_elapsed)} / {format_time(total_time_estimate)} ... {format_time(total_time_estimate - time_elapsed)} remaining"

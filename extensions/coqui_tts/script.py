@@ -37,32 +37,28 @@ def get_available_voices():
 
 
 def preprocess(raw_input):
-    raw_input = html.unescape(raw_input)
-    # raw_input = raw_input.strip("\"")
-    return raw_input
+    return html.unescape(raw_input)
 
 
 def new_split_into_sentences(self, text):
     sentences = self.seg.segment(text)
-    if params['remove_trailing_dots']:
-        sentences_without_dots = []
-        for sentence in sentences:
-            if sentence.endswith('.') and not sentence.endswith('...'):
-                sentence = sentence[:-1]
-
-            sentences_without_dots.append(sentence)
-
-        return sentences_without_dots
-    else:
+    if not params['remove_trailing_dots']:
         return sentences
+    sentences_without_dots = []
+    for sentence in sentences:
+        if sentence.endswith('.') and not sentence.endswith('...'):
+            sentence = sentence[:-1]
+
+        sentences_without_dots.append(sentence)
+
+    return sentences_without_dots
 
 
 Synthesizer.split_into_sentences = new_split_into_sentences
 
 
 def load_model():
-    model = TTS(params["model_name"]).to(params["device"])
-    return model
+    return TTS(params["model_name"]).to(params["device"])
 
 
 def remove_tts_from_history(history):

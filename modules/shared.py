@@ -287,17 +287,9 @@ if args.api or args.public_api:
 
 # Load model-specific settings
 with Path(f'{args.model_dir}/config.yaml') as p:
-    if p.exists():
-        model_config = yaml.safe_load(open(p, 'r').read())
-    else:
-        model_config = {}
-
+    model_config = yaml.safe_load(open(p, 'r').read()) if p.exists() else {}
 # Load custom model-specific settings
 with Path(f'{args.model_dir}/config-user.yaml') as p:
-    if p.exists():
-        user_config = yaml.safe_load(open(p, 'r').read())
-    else:
-        user_config = {}
-
+    user_config = yaml.safe_load(open(p, 'r').read()) if p.exists() else {}
 model_config = OrderedDict(model_config)
 user_config = OrderedDict(user_config)

@@ -77,13 +77,13 @@ class Handler(BaseHTTPRequestHandler):
 
 
     def _handle_get(self, search_strings: list[str], n_results: int, max_token_count: int, sort_param: str):
-        if sort_param == parameters.SORT_DISTANCE:
+        if (
+            sort_param == parameters.SORT_DISTANCE
+            or sort_param != parameters.SORT_ID
+        ):
             results = self.collector.get_sorted_by_dist(search_strings, n_results, max_token_count)
-        elif sort_param == parameters.SORT_ID:
+        else:
             results = self.collector.get_sorted_by_id(search_strings, n_results, max_token_count)
-        else: # Default is dist
-            results = self.collector.get_sorted_by_dist(search_strings, n_results, max_token_count)
-        
         return {
             "results": results
         }
@@ -197,7 +197,7 @@ class APIManager:
 
     def stop_server(self):
         if self.server is not None:
-            logger.info(f'Stopping chromaDB API.')
+            logger.info('Stopping chromaDB API.')
             self.server.shutdown()
             self.server.server_close()
             self.server = None

@@ -28,18 +28,12 @@ def _remove_tag_if_necessary(user_input: str):
 def _should_query(input: str):
     if not parameters.get_is_manual():
         return True
-    
-    if re.search(r'^\s*!c|!c\s*$', input, re.MULTILINE):
-        return True
-    
-    return False
+
+    return bool(re.search(r'^\s*!c|!c\s*$', input, re.MULTILINE))
 
 
 def _format_single_exchange(name, text):
-    if re.search(r':\s*$', name):
-        return '{} {}\n'.format(name, text)
-    else:
-        return '{}: {}\n'.format(name, text)
+    return f'{name} {text}\n' if re.search(r':\s*$', name) else f'{name}: {text}\n'
 
 
 def _get_names(state: dict):
@@ -100,10 +94,7 @@ def _hijack_last(context_text: str, history: dict, max_len: int, state: dict):
 
 def custom_generate_chat_prompt_internal(user_input: str, state: dict, collector: ChromaCollector, **kwargs):
     if parameters.get_add_chat_to_data():
-        # Get the whole history as one string
-        history_as_text = _concatinate_history(kwargs['history'], state)
-
-        if history_as_text:
+        if history_as_text := _concatinate_history(kwargs['history'], state):
             # Delete all documents that were auto-inserted
             collector.delete(ids_to_delete=None, where=CHAT_METADATA)
             # Insert the processed history
@@ -120,5 +111,5 @@ def custom_generate_chat_prompt_internal(user_input: str, state: dict, collector
             user_input = create_context_text(results) + user_input
         elif parameters.get_injection_strategy() == parameters.HIJACK_LAST_IN_CONTEXT:
             _hijack_last(create_context_text(results), kwargs['history'], state['truncation_length'], state)
-    
+
     return chat.generate_chat_prompt(user_input, state, **kwargs)

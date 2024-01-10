@@ -58,12 +58,12 @@ class LlamaCppModel:
         del self.model
 
     @classmethod
-    def from_pretrained(self, path):
+    def from_pretrained(cls, path):
 
         Llama = llama_cpp_lib().Llama
         LlamaCache = llama_cpp_lib().LlamaCache
 
-        result = self()
+        result = cls()
         cache_capacity = 0
         if shared.args.cache_capacity is not None:
             if 'GiB' in shared.args.cache_capacity:
@@ -74,7 +74,7 @@ class LlamaCppModel:
                 cache_capacity = int(shared.args.cache_capacity)
 
         if cache_capacity > 0:
-            logger.info("Cache capacity is " + str(cache_capacity) + " bytes")
+            logger.info(f"Cache capacity is {cache_capacity} bytes")
 
         if shared.args.tensor_split is None or shared.args.tensor_split.strip() == '':
             tensor_split_list = None
@@ -144,8 +144,7 @@ class LlamaCppModel:
             logit_processors.append(partial(ban_eos_logits_processor, self.model.token_eos()))
 
         if state['custom_token_bans']:
-            to_ban = [int(x) for x in state['custom_token_bans'].split(',')]
-            if len(to_ban) > 0:
+            if to_ban := [int(x) for x in state['custom_token_bans'].split(',')]:
                 logit_processors.append(partial(custom_token_ban_logits_processor, to_ban))
 
         completion_chunks = self.model.create_completion(

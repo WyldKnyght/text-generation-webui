@@ -60,13 +60,11 @@ class LLaVA_v0_Pipeline(AbstractMultimodalPipeline):
         projector_shape = self.llava_projector_shape()
         if len(projector_shape) == 2:
             return torch.nn.Linear(*projector_shape)
-        else:
-            modules = []
-            modules.append(torch.nn.Linear(projector_shape[0], projector_shape[1]))
-            for i in range(2, len(projector_shape)):
-                modules.append(torch.nn.GELU())
-                modules.append(torch.nn.Linear(projector_shape[i-1], projector_shape[i]))
-            return torch.nn.Sequential(*modules)
+        modules = [torch.nn.Linear(projector_shape[0], projector_shape[1])]
+        for i in range(2, len(projector_shape)):
+            modules.append(torch.nn.GELU())
+            modules.append(torch.nn.Linear(projector_shape[i-1], projector_shape[i]))
+        return torch.nn.Sequential(*modules)
 
     @staticmethod
     def image_start() -> str:

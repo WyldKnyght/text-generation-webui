@@ -28,8 +28,8 @@ def _markdown_hyperparams():
         # Escape any markdown syntax
         param_name = re.sub(r"([_*\[\]()~`>#+-.!])", r"\\\1", param_name)
         param_value_default = re.sub(r"([_*\[\]()~`>#+-.!])", r"\\\1", str(param_value['default'])) if param_value['default'] else ' '
-        
-        res.append('* {}: **{}**'.format(param_name, param_value_default))
+
+        res.append(f'* {param_name}: **{param_value_default}**')
 
     return '\n'.join(res)
 
@@ -55,8 +55,7 @@ def _set_hyperparameters(params):
 
 # Check if the parameter is for optimization.
 def _is_optimization_param(val):
-    is_opt = val.get('should_optimize', False) # Either does not exist or is false
-    return is_opt
+    return val.get('should_optimize', False)
 
 
 # Create a hashable representation of the parameters
@@ -67,7 +66,7 @@ def _get_params_hash(params):
 
 def optimize(collector, progress=gr.Progress()):
     # Inform the user that something is happening.
-    progress(0, desc=f'Setting Up...')
+    progress(0, desc='Setting Up...')
 
     # Track the current step
     current_step = 0

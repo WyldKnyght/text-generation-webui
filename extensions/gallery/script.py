@@ -10,7 +10,7 @@ cards = []
 
 
 def generate_css():
-    css = """
+    return """
       .highlighted-border {
         border-color: rgb(249, 115, 22) !important;
       }
@@ -61,7 +61,6 @@ def generate_css():
         overflow-wrap: anywhere;
       }
     """
-    return css
 
 
 def generate_html():
@@ -72,13 +71,17 @@ def generate_html():
         if file.suffix in [".json", ".yml", ".yaml"]:
             character = file.stem
             container_html = '<div class="character-container">'
-            image_html = "<div class='placeholder'></div>"
-
-            for path in [Path(f"characters/{character}.{extension}") for extension in ['png', 'jpg', 'jpeg']]:
-                if path.exists():
-                    image_html = f'<img src="file/{get_image_cache(path)}">'
-                    break
-
+            image_html = next(
+                (
+                    f'<img src="file/{get_image_cache(path)}">'
+                    for path in [
+                        Path(f"characters/{character}.{extension}")
+                        for extension in ['png', 'jpg', 'jpeg']
+                    ]
+                    if path.exists()
+                ),
+                "<div class='placeholder'></div>",
+            )
             container_html += f'{image_html} <span class="character-name">{character}</span>'
             container_html += "</div>"
             cards.append([container_html, character])
@@ -105,7 +108,7 @@ def custom_js():
 
 def ui():
     with gr.Accordion("Character gallery", open=settings["gallery-open"], elem_id='gallery-extension'):
-        gr.HTML(value="<style>" + generate_css() + "</style>")
+        gr.HTML(value=f"<style>{generate_css()}</style>")
         with gr.Row():
             filter_box = gr.Textbox(label='', placeholder='Filter', lines=1, max_lines=1, container=False, elem_id='gallery-filter-box')
             gr.ClearButton(filter_box, value='Clear', elem_classes='refresh-button')

@@ -113,7 +113,4 @@ def get_truncation_length():
 
 def load_grammar(name):
     p = Path(f'grammars/{name}')
-    if p.exists():
-        return open(p, 'r').read()
-    else:
-        return ''
+    return open(p, 'r').read() if p.exists() else ''

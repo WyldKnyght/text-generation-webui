@@ -56,10 +56,7 @@ def cpu_has_avx2():
         import cpuinfo
 
         info = cpuinfo.get_cpu_info()
-        if 'avx2' in info['flags']:
-            return True
-        else:
-            return False
+        return 'avx2' in info['flags']
     except:
         return True
 
@@ -69,22 +66,20 @@ def cpu_has_amx():
         import cpuinfo
 
         info = cpuinfo.get_cpu_info()
-        if 'amx' in info['flags']:
-            return True
-        else:
-            return False
+        return 'amx' in info['flags']
     except:
         return True
 
 
 def torch_version():
-    site_packages_path = None
-    for sitedir in site.getsitepackages():
-        if "site-packages" in sitedir and conda_env_path in sitedir:
-            site_packages_path = sitedir
-            break
-
-    if site_packages_path:
+    if site_packages_path := next(
+        (
+            sitedir
+            for sitedir in site.getsitepackages()
+            if "site-packages" in sitedir and conda_env_path in sitedir
+        ),
+        None,
+    ):
         torch_version_file = open(os.path.join(site_packages_path, 'torch', 'version.py')).read().splitlines()
         torver = [line for line in torch_version_file if '__version__' in line][0].split('__version__ = ')[1].strip("'")
     else:
@@ -94,13 +89,14 @@ def torch_version():
 
 
 def is_installed():
-    site_packages_path = None
-    for sitedir in site.getsitepackages():
-        if "site-packages" in sitedir and conda_env_path in sitedir:
-            site_packages_path = sitedir
-            break
-
-    if site_packages_path:
+    if site_packages_path := next(
+        (
+            sitedir
+            for sitedir in site.getsitepackages()
+            if "site-packages" in sitedir and conda_env_path in sitedir
+        ),
+        None,
+    ):
         return os.path.isfile(os.path.join(site_packages_path, 'torch', '__init__.py'))
     else:
         return os.path.isdir(conda_env_path)
@@ -159,7 +155,10 @@ def run_cmd(cmd, assert_success=False, environment=False, capture_output=False, 
 
     # Assert the command ran successfully
     if assert_success and result.returncode != 0:
-        print("Command '" + cmd + "' failed with exit status code '" + str(result.returncode) + "'.\n\nExiting now.\nTry running the start/update script again.")
+        print(
+            f"Command '{cmd}' failed with exit status code '{str(result.returncode)}"
+            + "'.\n\nExiting now.\nTry running the start/update script again."
+        )
         sys.exit(1)
 
     return result
@@ -291,7 +290,11 @@ def update_requirements(initial_installation=False):
         for i, extension in enumerate(extensions):
             print(f"\n\n--- [{i+1}/{len(extensions)}]: {extension}\n\n")
             extension_req_path = os.path.join("extensions", extension, "requirements.txt")
-            run_cmd("python -m pip install -r " + extension_req_path + " --upgrade", assert_success=False, environment=True)
+            run_cmd(
+                f"python -m pip install -r {extension_req_path} --upgrade",
+                assert_success=False,
+                environment=True,
+            )
     elif initial_installation:
         print_big_message("Will not install extensions due to INSTALL_EXTENSIONS environment variable.")
 
@@ -335,13 +338,16 @@ def update_requirements(initial_installation=False):
     for req in git_requirements:
         url = req.replace("git+", "")
         package_name = url.split("/")[-1].split("@")[0].rstrip(".git")
-        run_cmd("python -m pip uninstall -y " + package_name, environment=True)
+        run_cmd(f"python -m pip uninstall -y {package_name}", environment=True)
         print(f"Uninstalled {package_name}")
 
     # Make sure that API requirements are installed (temporary)
     extension_req_path = os.path.join("extensions", "openai", "requirements.txt")
     if os.path.exists(extension_req_path):
-        run_cmd("python -m pip install -r " + extension_req_path + " --upgrade", environment=True)
+        run_cmd(
+            f"python -m pip install -r {extension_req_path} --upgrade",
+            environment=True,
+        )
 
     # Install/update the project requirements
     run_cmd("python -m pip install -r temp_requirements.txt --upgrade", assert_success=True, environment=True)
@@ -390,7 +396,11 @@ if __name__ == "__main__":
         else:
             model_dir = 'models'
 
-        if len([item for item in glob.glob(f'{model_dir}/*') if not item.endswith(('.txt', '.yaml'))]) == 0:
+        if not [
+            item
+            for item in glob.glob(f'{model_dir}/*')
+            if not item.endswith(('.txt', '.yaml'))
+        ]:
             print_big_message("WARNING: You haven't downloaded any model yet.\nOnce the web UI launches, head over to the \"Model\" tab and download one.")
 
         # Workaround for llama-cpp-python loading paths in CUDA env vars even if they do not exist

@@ -58,9 +58,8 @@ class Parameters:
     def __init__(self):
         if Parameters._instance is not None:
             raise Exception("This class is a singleton!")
-        else:
-            Parameters._instance = self
-            self.hyperparameters = self._load_from_json(Path("extensions/superboogav2/config.json"))
+        Parameters._instance = self
+        self.hyperparameters = self._load_from_json(Path("extensions/superboogav2/config.json"))
 
     def _load_from_json(self, file_path):
         logger.debug('Loading hyperparameters...')
@@ -159,14 +158,22 @@ def set_delta_start(value: int):
 
 
 def get_chunk_len() -> str:
-    lens = []
     mask = Parameters.getInstance().hyperparameters['chunk_len_mask']['default']
 
-    lens.append(Parameters.getInstance().hyperparameters['chunk_len1']['default'] if mask & (1 << 0) else None)
-    lens.append(Parameters.getInstance().hyperparameters['chunk_len2']['default'] if mask & (1 << 1) else None)
-    lens.append(Parameters.getInstance().hyperparameters['chunk_len3']['default'] if mask & (1 << 2) else None)
-    lens.append(Parameters.getInstance().hyperparameters['chunk_len4']['default'] if mask & (1 << 3) else None)
-
+    lens = [
+        Parameters.getInstance().hyperparameters['chunk_len1']['default']
+        if mask & (1 << 0)
+        else None,
+        Parameters.getInstance().hyperparameters['chunk_len2']['default']
+        if mask & (1 << 1)
+        else None,
+        Parameters.getInstance().hyperparameters['chunk_len3']['default']
+        if mask & (1 << 2)
+        else None,
+        Parameters.getInstance().hyperparameters['chunk_len4']['default']
+        if mask & (1 << 3)
+        else None,
+    ]
     return ','.join([str(len) for len in lens if len])
 
 
@@ -194,8 +201,19 @@ def set_chunk_len(val: str):
 
 
 def get_context_len() -> str:
-    context_len = str(Parameters.getInstance().hyperparameters['context_len_left']['default']) + ',' + str(Parameters.getInstance().hyperparameters['context_len_right']['default'])
-    return context_len
+    return (
+        str(
+            Parameters.getInstance().hyperparameters['context_len_left'][
+                'default'
+            ]
+        )
+        + ','
+        + str(
+            Parameters.getInstance().hyperparameters['context_len_right'][
+                'default'
+            ]
+        )
+    )
 
 
 def set_context_len(val: str):
